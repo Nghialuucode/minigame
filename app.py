@@ -6,11 +6,11 @@ import streamlit.components.v1 as components
 st.set_page_config(page_title="Rút Gỗ Số", page_icon="🪵", layout="wide",
                    initial_sidebar_state="expanded")
 
-# CSS tối ưu cho cả PC và Mobile, xóa viền thừa của Streamlit
+# CSS tối ưu cho cả PC và Mobile
 st.markdown(
     """<style>
     .block-container{padding:0 !important; max-width:100% !important;}
-    header[data-testid="stHeader"]{display:none !important;} /* Ẩn thanh header của Streamlit trên mobile */
+    header[data-testid="stHeader"]{display:none !important;}
     iframe{border-radius:0; border:none; display:block;}
     </style>""",
     unsafe_allow_html=True,
@@ -24,13 +24,22 @@ ss = st.session_state
 ss.setdefault("game_key", 0)
 ss.setdefault("game_cfg", None)
 
+# Tự động tạo cấu hình mặc định để chơi ngay lập tức (Không cần bấm Bắt đầu)
+if ss.game_cfg is None:
+    ss.game_cfg = {
+        "players": ["Người chơi 1", "Người chơi 2", "Người chơi 3"],
+        "layers": 12
+    }
+
 with st.sidebar:
     st.title("🪵 Rút Gỗ Số")
+    st.caption("💡 Trên điện thoại, hãy bấm biểu tượng **>>** ở góc trên cùng bên trái để mở menu này.")
     
     with st.form("setup"):
         st.markdown("**Cấu hình ván mới**")
-        raw = st.text_area("Người chơi (tối đa 8, mỗi dòng 1 tên)", "An\nBình\nChi", height=110)
-        layers = st.slider("Số tầng của tháp", 6, 18, 12)
+        default_players = "\n".join(ss.game_cfg["players"])
+        raw = st.text_area("Người chơi (tối đa 8, mỗi dòng 1 tên)", default_players, height=110)
+        layers = st.slider("Số tầng của tháp", 6, 18, ss.game_cfg["layers"])
         started = st.form_submit_button("🎮 Bắt đầu / Chơi lại", type="primary", use_container_width=True)
 
     if started:
@@ -51,10 +60,6 @@ with st.sidebar:
             "- Ai làm tháp đổ là người thua."
         )
 
-if ss.game_cfg is None:
-    st.info("👈 Cấu hình ở thanh bên, sau đó bấm **Bắt đầu / Chơi lại**.")
-    st.stop()
-
 cfg = {
     "players": ss.game_cfg["players"],
     "layers":  ss.game_cfg["layers"],
@@ -64,7 +69,7 @@ cfg = {
 cfg_json = json.dumps(cfg, ensure_ascii=False).replace("<", "\\u003c")
 marker = f"<!-- game_key:{ss.game_key} -->\n"
 
-# Tự động co giãn iframe theo chiều cao màn hình thiết bị
+# Load game
 components.html(marker + load_game_html().replace("__CONFIG__", cfg_json), height=850, scrolling=False)
 
 # Bridge gửi âm thanh từ Sidebar sang Game
