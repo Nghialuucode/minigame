@@ -3,16 +3,20 @@ from pathlib import Path
 import streamlit as st
 import streamlit.components.v1 as components
 
-# Đặt centered để giao diện gọn gàng trên mobile
 st.set_page_config(page_title="Rút Gỗ Số", page_icon="🪵", layout="centered", initial_sidebar_state="collapsed")
 
-# CSS tối ưu: Xóa viền thừa, chỉnh iframe vừa vặn màn hình
+# CSS ép iframe tự động co giãn vừa khít 100% màn hình điện thoại (100dvh)
 st.markdown(
     """<style>
-    .block-container{padding:10px !important; max-width:800px !important;}
-    header[data-testid="stHeader"]{display:none !important;}
-    iframe{border-radius:12px; border:none; display:block; box-shadow:0 4px 12px rgba(0,0,0,0.5);}
-    div[data-testid="stExpander"] { margin-bottom: 10px; }
+    .block-container {padding: 0 !important; max-width: 100% !important;}
+    header[data-testid="stHeader"] {display: none !important;}
+    iframe[title="streamlit_component"] {
+        width: 100% !important;
+        height: 100dvh !important; 
+        border: none;
+        display: block;
+    }
+    div[data-testid="stExpander"] { margin: 10px; background: #10131b; border-radius: 12px;}
     </style>""",
     unsafe_allow_html=True,
 )
@@ -27,7 +31,7 @@ ss.setdefault("game_cfg", {"players": ["Người chơi 1", "Người chơi 2", "
 ss.setdefault("sound_on", True)
 ss.setdefault("volume", 70)
 
-# Cấu hình hiển thị ngay trên màn hình chính (Bấm để mở rộng)
+# Cấu hình hiển thị trên cùng
 with st.expander("⚙️ Cấu hình ván chơi", expanded=False):
     with st.form("setup"):
         raw = st.text_area("Người chơi (tối đa 8, mỗi dòng 1 tên)", "\n".join(ss.game_cfg["players"]), height=100)
@@ -49,7 +53,6 @@ with st.expander("⚙️ Cấu hình ván chơi", expanded=False):
         ss.volume = volume
         ss.game_key += 1
     else:
-        # Cập nhật âm thanh liên tục nếu không bấm Bắt đầu
         ss.sound_on = sound_on
         ss.volume = volume
 
@@ -63,8 +66,8 @@ cfg = {
 cfg_json = json.dumps(cfg, ensure_ascii=False).replace("<", "\\u003c")
 marker = f"<!-- game_key:{ss.game_key} -->\n"
 
-# Load game với chiều cao 750px để không bị thanh trình duyệt che khuất
-components.html(marker + load_game_html().replace("__CONFIG__", cfg_json), height=750, scrolling=False)
+# Load game
+components.html(marker + load_game_html().replace("__CONFIG__", cfg_json), height=700, scrolling=False)
 
 # Bridge gửi âm thanh từ Streamlit sang Game
 bridge = f"""
