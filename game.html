@@ -57,12 +57,13 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-of
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
 <script>
 const CFG = __CONFIG__;
-// ---- Thông số vật lý & luật (chỉnh ở đây) ----
-const PHYS = {FRICTION:.6, GRAVITY:-22, SPEED:2.2, PULL_DIST:3.5, TILT:.82, SAG:.3, DRIFT:1.95};
+// ---- Vật lý & luật (đã nới ngưỡng sập để tháp bền hơn) ----
+const PHYS = {FRICTION:.78, GRAVITY:-22, SPEED:2.2, PULL_DIST:3.5,
+              TILT:.72, SAG:.5, DRIFT:2.4};
 const L=3, H=.6, W=1, GAP=.02, STEP=H+GAP, OFF=W+GAP;
 const $=s=>document.querySelector(s);
 
-// ================= ÂM THANH (WebAudio, không cần file) =================
+// ================= ÂM THANH =================
 const Snd={ctx:null,on:CFG.sound,vol:CFG.volume,nb:null,
  init(){if(!this.on)return;if(!this.ctx){const A=window.AudioContext||window.webkitAudioContext;if(!A)return;this.ctx=new A();const n=this.ctx.sampleRate;this.nb=this.ctx.createBuffer(1,n,n);const d=this.nb.getChannelData(0);for(let i=0;i<n;i++)d[i]=Math.random()*2-1}
   if(this.ctx.state==='suspended')this.ctx.resume()},
@@ -80,13 +81,23 @@ const Snd={ctx:null,on:CFG.sound,vol:CFG.volume,nb:null,
  warn(){this.tone(220,150,.22,'sawtooth',.1)},
  slide(d){this.noise(d,'bandpass',350,900,.22,0,2.5);this.noise(d,'lowpass',220,160,.16)},
  thud(v,delay=0){const g=Math.min(.55,.08*v);this.noise(.14,'lowpass',500,120,g,delay);this.tone(130,55,.16,'sine',g*.9,delay)},
- place(){this.thud(5);this.tone(420,300,.07,'square',.06)},
+ good(){[523,659,784].forEach((f,i)=>this.tone(f,f,.14,'triangle',.1,i*.07))},
+ vanish(){this.tone(450,900,.15,'triangle',.1);this.tone(900,600,.14,'sine',.06,.08)},
  collapse(){for(let i=0;i<16;i++)this.thud(3+Math.random()*5,i*.09+Math.random()*.08);this.noise(1.8,'lowpass',700,60,.5);
-  [392,330,262,196].forEach((f,i)=>this.tone(f,f*.98,.25,'sawtooth',.08,1.3+i*.18))},
- good(){[523,659,784].forEach((f,i)=>this.tone(f,f,.14,'triangle',.1,i*.07))}
+  [392,330,262,196].forEach((f,i)=>this.tone(f,f*.98,.25,'sawtooth',.08,1.3+i*.18))}
 };
 
-// ================= KHỞI TẠO 3D + VẬT LÝ =================
+// ---- Bridge từ Streamlit sidebar: điều khiển âm thanh LIVE ----
+window.addEventListener('message', e=>{
+  const d=e.data;
+  if(!d||d.type!=='sound')return;
+  Snd.on=!!d.on;
+  Snd.vol=Math.max(0,Math.min(1,Number(d.volume)||0));
+  if(Snd.on)Snd.init();
+  ui();
+});
+
+// ================= 3D + VẬT LÝ =================
 const cv=$('#c');
 const ren=new THREE.WebGLRenderer({canvas:cv,antialias:true});
 ren.setPixelRatio(Math.min(devicePixelRatio,2));ren.shadowMap.enabled=true;ren.shadowMap.type=THREE.PCFSoftShadowMap;
@@ -107,7 +118,7 @@ const wood=new CANNON.Material('wood');
 world.addContactMaterial(new CANNON.ContactMaterial(wood,wood,{friction:PHYS.FRICTION,restitution:0,frictionEquationRelaxation:3}));
 const gnd=new CANNON.Body({mass:0,material:wood});gnd.addShape(new CANNON.Plane());gnd.quaternion.setFromEuler(-Math.PI/2,0,0);world.addBody(gnd);
 
-// ================= KHỐI GỖ + SỐ IN TRÊN GỖ =================
+// ================= KHỐI GỖ =================
 const boxGeo=new THREE.BoxGeometry(L,H,W);
 function woodTex(w,h,hue,light,num,fs,pw){
   const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');
@@ -123,143 +134,11 @@ function makeMats(id){
   const end=mk(woodTex(192,115,hue,li,id,66,128)),top=mk(woodTex(256,96,hue,li-4,null)),lng=mk(woodTex(640,128,hue,li,id,88,190));
   return {list:[end,top,lng],arr:[end,end,top,top,lng,lng]}}
 
-let blocks=[],hold=null,selected=null,hover=null,state='idle',turn=0,scores=[],time=0,shake=0,fx=[],lastHit=0,dir={x:1,z:0},pull={s:0,start:null,t:0};
+let blocks=[],hold=null,selected=null,hover=null,state='idle',turn=0,scores=[],time=0,shake=0,fx=[],lastHit=0,dir={x:1,z:0},pull={s:0,t:0,start:null,vy:null};
 const N=CFG.players.length;
 
 function pose(layer,slot){const y=H/2+layer*STEP,o=(slot-1)*OFF;return layer%2===0?{x:0,y,z:o,r:0}:{x:o,y,z:0,r:Math.PI/2}}
 function addBody(b,p,drop=0){
   const body=new CANNON.Body({mass:1,material:wood});body.addShape(new CANNON.Box(new CANNON.Vec3(L/2,H/2,W/2)));
   body.position.set(p.x,p.y+drop,p.z);body.quaternion.setFromEuler(0,p.r,0);
-  body.allowSleep=true;body.sleepSpeedLimit=.2;body.sleepTimeLimit=.5;body.linearDamping=.04;body.angularDamping=.1;
-  body.addEventListener('collide',e=>{if(state==='over')return;const v=Math.abs(e.contact.getImpactVelocityAlongNormal()),n=performance.now();
-    if(v>1.2&&n-lastHit>40){lastHit=n;Snd.thud(v)}});
-  world.addBody(body);b.body=body;b.home=p.y}
-function build(){
-  blocks.forEach(b=>{scene.remove(b.mesh);if(b.body)world.remove(b.body);b.mats.list.forEach(m=>{m.map.dispose();m.dispose()})});
-  blocks=[];hold=null;selected=null;let id=1;
-  for(let l=0;l<CFG.layers;l++)for(let s=0;s<3;s++){
-    const m=makeMats(id),mesh=new THREE.Mesh(boxGeo,m.arr);mesh.castShadow=mesh.receiveShadow=true;
-    const b={id:id++,mesh,mats:m,layer:l,slot:s,body:null,home:0};mesh.userData.b=b;scene.add(mesh);
-    const p=pose(l,s);addBody(b,p);b.body.sleep();mesh.position.set(p.x,p.y,p.z);mesh.rotation.y=p.r;blocks.push(b)}
-  scores=CFG.players.map(()=>0);turn=0;state='idle';shake=0;
-  buildPad();ui()}
-const topLayer=()=>{let t=0;blocks.forEach(b=>{if(b!==hold&&b.layer>t)t=b.layer});return t};
-
-// ================= HIỆU ỨNG =================
-function dust(x,y,z,n,spread=1,col=0xd9b27c){
-  const g=new THREE.BufferGeometry(),pos=new Float32Array(n*3),vel=[];
-  for(let i=0;i<n;i++){pos.set([x+(Math.random()-.5)*spread,y,z+(Math.random()-.5)*spread],i*3);vel.push(new THREE.Vector3((Math.random()-.5)*2,Math.random()*2,(Math.random()-.5)*2))}
-  g.setAttribute('position',new THREE.BufferAttribute(pos,3));
-  const m=new THREE.PointsMaterial({color:col,size:.13,transparent:true,opacity:.8,depthWrite:false}),p=new THREE.Points(g,m);scene.add(p);fx.push({p,vel,t:0})}
-function stepFx(dt){for(let i=fx.length-1;i>=0;i--){const f=fx[i];f.t+=dt;const a=f.p.geometry.attributes.position;
-  f.vel.forEach((v,k)=>{a.setXYZ(k,a.getX(k)+v.x*dt,a.getY(k)+v.y*dt,a.getZ(k)+v.z*dt);v.multiplyScalar(.97);v.y-=dt*1.5});a.needsUpdate=true;
-  f.p.material.opacity=.8*Math.max(0,1-f.t/1.1);if(f.t>1.1){scene.remove(f.p);f.p.geometry.dispose();f.p.material.dispose();fx.splice(i,1)}}}
-let tt;function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>e.classList.remove('show'),1900)}
-
-// ================= GIAO DIỆN =================
-function buildPad(){const p=$('#pad');p.innerHTML='';blocks.forEach(b=>{const e=document.createElement('button');e.textContent=b.id;e.dataset.id=b.id;e.onclick=()=>choose(b);p.appendChild(e)})}
-function ui(){
-  $('#turn').innerHTML=`Lượt của <b>${CFG.players[turn]}</b>`;
-  $('#score').innerHTML=CFG.players.map((n,i)=>`<div class="${i===turn?'on':''}"><span>${n}</span><span>${scores[i]}</span></div>`).join('');
-  const tl=topLayer();
-  document.querySelectorAll('#pad button').forEach(e=>{const b=blocks[e.dataset.id-1];e.classList.toggle('lock',b.layer>=tl);e.classList.toggle('sel',b===selected)});
-  $('#pull').disabled=!(selected&&state==='idle');$('#pull').textContent=selected?`Rút khối ${selected.id}`:'Rút gỗ';
-  $('#msg').textContent=state!=='idle'?'Đang rút…':selected?`Đã chọn khối ${selected.id}`:'Bấm khối gỗ hoặc chọn số';
-  $('#bSnd').textContent=Snd.on?'Âm thanh: bật':'Âm thanh: tắt'}
-function choose(b){
-  Snd.init();if(state!=='idle'){toast('Đợi khối này xong đã');return}
-  if(!b||b.layer>=topLayer()){Snd.warn();toast('Các khối ở tầng trên cùng chưa được rút');return}
-  selected=b;Snd.select();ui()}
-
-// ================= RÚT GỖ =================
-function startPull(){
-  if(!selected||state!=='idle')return;Snd.init();hold=selected;const b=hold,body=b.body;
-  const ax=b.layer%2===0?{x:1,z:0}:{x:0,z:1},d=ax.x*Math.sin(orb.az)+ax.z*Math.cos(orb.az),sg=d>=0?1:-1;
-  dir={x:ax.x*sg,z:ax.z*sg};
-  body.type=CANNON.Body.KINEMATIC;body.mass=0;body.updateMassProperties();body.allowSleep=false;body.wakeUp();
-  pull={s:0,t:0,start:{x:body.position.x,y:body.position.y,z:body.position.z}};state='pull';
-  Snd.slide(PHYS.PULL_DIST/PHYS.SPEED);ui()}
-function beginPlace(){
-  const others=blocks.filter(b=>b!==hold);let top=0;others.forEach(b=>{if(b.layer>top)top=b.layer});
-  const row=others.filter(b=>b.layer===top);let layer=top,slot;
-  if(row.length>=3){layer=top+1;slot=0}else{const used=row.map(b=>b.slot);slot=[0,1,2].find(s=>!used.includes(s))}
-  const m=hold.mesh;pull.from=m.position.clone();pull.q0=m.quaternion.clone();pull.tgt=pose(layer,slot);pull.layer=layer;pull.slot=slot;
-  pull.q1=new THREE.Quaternion().setFromEuler(new THREE.Euler(0,pull.tgt.r,0));pull.t=0;
-  world.remove(hold.body);hold.body=null;state='place';Snd.tone(300,600,.35,'sine',.07)}
-function finishPlace(){
-  const p=pull.tgt;hold.layer=pull.layer;hold.slot=pull.slot;addBody(hold,p,.05);
-  Snd.place();dust(p.x,p.y,p.z,18,1.6);scores[turn]++;state='after';pull.t=0}
-function endTurn(){
-  hold=null;selected=null;turn=(turn+1)%N;state='idle';Snd.good();ui();toast(`Lượt của ${CFG.players[turn]}`)}
-
-// ================= SẬP THÁP =================
-function collapsed(){
-  for(const b of blocks){if(b===hold||!b.body)continue;const p=b.body.position,q=b.body.quaternion,up=1-2*(q.x*q.x+q.z*q.z);
-    if(p.y<b.home-PHYS.SAG||up<PHYS.TILT||Math.abs(p.x)>PHYS.DRIFT||Math.abs(p.z)>PHYS.DRIFT)return true}
-  return false}
-function triggerCollapse(){
-  const loser=turn;
-  if(hold){if(!hold.body)addBody(hold,{x:hold.mesh.position.x,y:hold.mesh.position.y,z:hold.mesh.position.z,r:0}),hold.body.quaternion.copy(hold.mesh.quaternion);
-    else{const b=hold.body;b.type=CANNON.Body.DYNAMIC;b.mass=1;b.updateMassProperties();b.allowSleep=true}}
-  state='over';blocks.forEach(b=>b.body&&b.body.wakeUp());
-  Snd.collapse();shake=.7;
-  for(let i=0;i<5;i++)setTimeout(()=>dust((Math.random()-.5)*3,.3,(Math.random()-.5)*3,24,3),i*180);
-  setTimeout(()=>{
-    $('#eT').textContent='Tháp sập rồi!';
-    $('#eP').textContent=`${CFG.players[loser]} làm đổ tháp ở lượt này.`;
-    $('#eR').innerHTML=CFG.players.map((n,i)=>({n,s:scores[i]})).sort((a,b)=>b.s-a.s).map(o=>`<div>${o.n}: ${o.s} khối</div>`).join('');
-    $('#end').classList.add('show')},2300)}
-
-// ================= CAMERA & ĐIỀU KHIỂN =================
-const orb={az:.7,pol:1.12,r:15},tgt=new THREE.Vector3(0,3,0),ray=new THREE.Raycaster(),mouse=new THREE.Vector2();
-function pick(cx,cy){const r=cv.getBoundingClientRect();mouse.set((cx-r.left)/r.width*2-1,-((cy-r.top)/r.height)*2+1);ray.setFromCamera(mouse,cam);
-  const h=ray.intersectObjects(blocks.map(b=>b.mesh))[0];return h?h.object.userData.b:null}
-const ptr=new Map();let moved=0,lastTap={id:0,t:0},pinch=0;
-cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);ptr.set(e.pointerId,{x:e.clientX,y:e.clientY});moved=0;cv.style.cursor='grabbing';Snd.init()});
-cv.addEventListener('pointermove',e=>{
-  const p=ptr.get(e.pointerId);
-  if(!p){const b=pick(e.clientX,e.clientY);hover=b&&b.layer<topLayer()?b:null;cv.style.cursor=hover?'pointer':'grab';return}
-  if(ptr.size===2){const [a,c]=[...ptr.values()],d=Math.hypot(a.x-c.x,a.y-c.y);if(pinch)orb.r=Math.min(28,Math.max(7,orb.r*pinch/d));pinch=d}
-  else{const dx=e.clientX-p.x,dy=e.clientY-p.y;moved+=Math.abs(dx)+Math.abs(dy);orb.az-=dx*.008;orb.pol=Math.min(1.5,Math.max(.25,orb.pol-dy*.006))}
-  p.x=e.clientX;p.y=e.clientY});
-cv.addEventListener('pointerup',e=>{
-  const single=ptr.size===1;ptr.delete(e.pointerId);pinch=0;cv.style.cursor='grab';
-  if(single&&moved<8){const b=pick(e.clientX,e.clientY);
-    if(b){const now=performance.now();if(selected===b&&lastTap.id===b.id&&now-lastTap.t<450){startPull();return}lastTap={id:b.id,t:now};choose(b)}}});
-cv.addEventListener('pointercancel',e=>{ptr.delete(e.pointerId);pinch=0});
-cv.addEventListener('wheel',e=>{e.preventDefault();orb.r=Math.min(28,Math.max(7,orb.r*(1+e.deltaY*.001)))},{passive:false});
-$('#pull').onclick=startPull;
-$('#num').addEventListener('keydown',e=>{if(e.key==='Enter'){const b=blocks[parseInt(e.target.value)-1];if(b)choose(b);else{Snd.warn();toast('Không có khối số này')}}});
-$('#bPad').onclick=()=>{Snd.init();Snd.click();$('#pad').classList.toggle('hide')};
-$('#bSnd').onclick=()=>{Snd.on=!Snd.on;Snd.init();Snd.click();ui()};
-const restart=()=>{$('#end').classList.remove('show');Snd.init();Snd.click();build()};
-$('#bReset').onclick=restart;$('#again').onclick=restart;
-if(innerWidth<820)$('#pad').classList.add('hide');
-function resize(){ren.setSize(innerWidth,innerHeight,false);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()}
-addEventListener('resize',resize);resize();
-
-// ================= VÒNG LẶP =================
-const clk=new THREE.Clock(),EASE=u=>u<.5?2*u*u:1-Math.pow(-2*u+2,2)/2;
-function tick(){
-  requestAnimationFrame(tick);const dt=Math.min(clk.getDelta(),.05);time+=dt;
-  if(state==='pull'){
-    pull.s+=PHYS.SPEED*dt;const b=hold.body,s=pull.start;
-    b.position.set(s.x+dir.x*pull.s,s.y,s.z+dir.z*pull.s);b.velocity.set(dir.x*PHYS.SPEED,0,dir.z*PHYS.SPEED);b.angularVelocity.set(0,0,0);b.aabbNeedsUpdate=true;
-    if(pull.s>=PHYS.PULL_DIST){b.velocity.set(0,0,0);state='settle';pull.t=0}}
-  else if(state==='settle'){const b=hold.body;b.velocity.set(0,0,0);pull.t+=dt;if(pull.t>1)beginPlace()}
-  world.step(1/120,dt,6);
-  if(state==='place'){pull.t+=dt;const u=Math.min(1,pull.t/.8),e=EASE(u),m=hold.mesh,t=pull.tgt;
-    m.position.set(pull.from.x+(t.x-pull.from.x)*e,pull.from.y+(t.y+.05-pull.from.y)*e+Math.sin(Math.PI*u)*1.4,pull.from.z+(t.z-pull.from.z)*e);
-    m.quaternion.copy(pull.q0).slerp(pull.q1,e);if(u>=1)finishPlace()}
-  else if(state==='after'){pull.t+=dt;if(pull.t>.9)endTurn()}
-  if(state!=='over'&&collapsed())triggerCollapse();
-  for(const b of blocks){if(b.body){b.mesh.position.copy(b.body.position);b.mesh.quaternion.copy(b.body.quaternion)}
-    const sel=b===selected,hv=b===hover&&!sel,k=sel?.35+.25*Math.sin(time*5):hv?.12:0;
-    b.mats.list.forEach(m=>{m.emissive.setHex(sel?0x2de2c0:0xffffff);m.emissiveIntensity=k})}
-  stepFx(dt);
-  const topY=H+topLayer()*STEP;tgt.y+=(Math.max(2.4,topY*.48)-tgt.y)*Math.min(1,dt*2);
-  shake=Math.max(0,shake-dt*.5);const sx=(Math.random()-.5)*shake,sy=(Math.random()-.5)*shake;
-  cam.position.set(tgt.x+orb.r*Math.sin(orb.pol)*Math.sin(orb.az)+sx,tgt.y+orb.r*Math.cos(orb.pol)+sy,tgt.z+orb.r*Math.sin(orb.pol)*Math.cos(orb.az));
-  cam.lookAt(tgt);ren.render(scene,cam)}
-(document.fonts&&document.fonts.load?document.fonts.load('800 40px Sora'):Promise.resolve()).catch(()=>{}).then(()=>{build();tick()});
-</script></body></html>
+  body.allowSleep=true;body.sleepSpeedLimit=.2;body.sleep
