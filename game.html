@@ -5,7 +5,7 @@
 <style>
 :root{--bg:#10131b;--ink:#e9edf5;--mute:#8b93a7;--acc:#2de2c0;--warn:#ff6b57;--glass:rgba(22,26,38,.85);--line:rgba(255,255,255,.1)}
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{width:100%;height:100vh;background:var(--bg);color:var(--ink);font-family:Sora,system-ui,sans-serif;overflow:hidden;user-select:none;-webkit-user-select:none}
+html,body{width:100%;height:100%;background:var(--bg);color:var(--ink);font-family:Sora,system-ui,sans-serif;overflow:hidden;user-select:none;-webkit-user-select:none}
 #c{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
 .glass{background:var(--glass);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:16px}
 button{font:inherit;color:inherit;border:0;cursor:pointer;background:rgba(255,255,255,.08);border-radius:10px;padding:8px 12px;transition:transform .12s,background .15s}
@@ -78,8 +78,8 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-of
 
 <script>
 const CFG = __CONFIG__;
-// Đã chỉnh lại thông số cho tháp đổ nhạy hơn (TILT giảm, SAG giảm)
-const PHYS = {FRICTION:.7, GRAVITY:-22, SPEED:2.5, PULL_DIST:3.5, TILT:.85, SAG:.15, DRIFT:1.5};
+// Tinh chỉnh vật lý: SAG (độ sụt) = 0.25. Nếu lún quá 25cm là sập.
+const PHYS = {FRICTION:.7, GRAVITY:-22, SPEED:3.5, PULL_DIST:4.5, TILT:.85, SAG:.25, DRIFT:1.5};
 const L=3, H=.6, W=1, GAP=.02, STEP=H+GAP, OFF=W+GAP;
 const $=s=>document.querySelector(s);
 
@@ -131,7 +131,7 @@ try {
   scene.fog=new THREE.Fog(0x10131b,26,60);
   cam = new THREE.PerspectiveCamera(45,1,.1,100);
 } catch(e) {
-  alert("Thiết bị của bạn không hỗ trợ WebGL để chạy 3D!");
+  alert("Thiết bị không hỗ trợ WebGL!");
 }
 
 scene.add(new THREE.HemisphereLight(0xbcd0ff,0x1a1208,.6));
@@ -150,7 +150,7 @@ ring.rotation.x=-Math.PI/2;ring.position.y=.01;scene.add(ring);
 
 const world=new CANNON.World();
 world.gravity.set(0,PHYS.GRAVITY,0);
-world.allowSleep=true;
+world.allowSleep=false; // TẮT HOÀN TOÀN SLEEP ĐỂ FIX LỖI LƠ LỬNG
 world.solver.iterations=15;
 const wood=new CANNON.Material('wood');
 world.addContactMaterial(new CANNON.ContactMaterial(wood,wood,{friction:PHYS.FRICTION,restitution:0,frictionEquationRelaxation:3}));
@@ -180,6 +180,7 @@ function makeMats(id){
 
 let blocks=[], hold=null, selected=null, hover=null, state='idle';
 let turn=0, scores=[], time=0, shake=0, fx=[], lastHit=0, dir={x:1,z:0}, pull={s:0,t:0,start:null};
+let settleTime = 1.5; // Chờ 1.5s để tháp tự ổn định
 const N=CFG.players.length;
 
 function pose(layer,slot){const y=H/2+layer*STEP,o=(slot-1)*OFF;return layer%2===0?{x:0,y,z:o,r:0}:{x:o,y,z:0,r:Math.PI/2}}
@@ -188,7 +189,8 @@ function addBody(b,p,drop=0){
   const body=new CANNON.Body({mass:1,material:wood});
   body.addShape(new CANNON.Box(new CANNON.Vec3(L/2,H/2,W/2)));
   body.position.set(p.x,p.y+drop,p.z);body.quaternion.setFromEuler(0,p.r,0);
-  body.allowSleep=true;body.sleepSpeedLimit=.2;body.sleepTimeLimit=.5;body.linearDamping=.04;body.angularDamping=.1;
+  body.allowSleep=false; // TẮT SLEEP CHO TỪNG KHỐI
+  body.linearDamping=.04;body.angularDamping=.1;
   body.addEventListener('collide',e=>{if(state==='over')return;const v=Math.abs(e.contact.getImpactVelocityAlongNormal()),n=performance.now();
     if(v>1.2&&n-lastHit>40){lastHit=n;Snd.thud(v)}});
   world.addBody(body);b.body=body;b.home=p.y;
@@ -200,8 +202,9 @@ function build(){
   for(let l=0;l<CFG.layers;l++)for(let s=0;s<3;s++){
     const m=makeMats(id),mesh=new THREE.Mesh(boxGeo,m.arr);mesh.castShadow=mesh.receiveShadow=true;
     const b={id:id++,mesh,mats:m,layer:l,slot:s,body:null,home:0};mesh.userData.b=b;scene.add(mesh);
-    const p=pose(l,s);addBody(b,p);b.body.sleep();mesh.position.set(p.x,p.y,p.z);mesh.rotation.y=p.r;blocks.push(b)}
-  scores=CFG.players.map(()=>0);turn=0;state='idle';shake=0;
+    const p=pose(l,s);addBody(b,p);
+    mesh.position.set(p.x,p.y,p.z);mesh.rotation.y=p.r;blocks.push(b)}
+  scores=CFG.players.map(()=>0);turn=0;state='idle';shake=0;settleTime=1.5;
   buildPad();ui();
 }
 const topLayer=()=>{let t=0;blocks.forEach(b=>{if(b!==hold&&b.layer>t)t=b.layer});return t};
@@ -251,7 +254,7 @@ function startPull(){
   const ax=b.layer%2===0?{x:1,z:0}:{x:0,z:1},d=ax.x*Math.sin(orb.az)+ax.z*Math.cos(orb.az),sg=d>=0?1:-1;
   dir={x:ax.x*sg,z:ax.z*sg};
   
-  body.type=CANNON.Body.KINEMATIC;body.mass=0;body.updateMassProperties();body.allowSleep=false;body.wakeUp();
+  body.type=CANNON.Body.KINEMATIC;body.mass=0;body.updateMassProperties();body.wakeUp();
   pull={s:0,t:0,start:{x:body.position.x,y:body.position.y,z:body.position.z}};
   state='pull';
   Snd.slide(PHYS.PULL_DIST/PHYS.SPEED);ui();
@@ -260,8 +263,7 @@ function startPull(){
 function finishPull(){
   world.remove(hold.body); hold.body=null;
   
-  // QUAN TRỌNG: Phải đánh thức toàn bộ khối còn lại để chúng nhận ra mất trụ đỡ
-  blocks.forEach(b => { if(b.body) b.body.wakeUp(); });
+  blocks.forEach(b => { if(b.body) b.body.wakeUp(); }); // Đánh thức toàn bộ
   
   scores[turn]++; Snd.vanish(); state='vanish'; pull.t=0; 
   dust(hold.mesh.position.x, hold.mesh.position.y, hold.mesh.position.z, 15, 1.5, 0x2de2c0);
@@ -272,7 +274,6 @@ function collapsed(){
   for(const b of blocks){
     if(b===hold||!b.body)continue;
     const p=b.body.position,q=b.body.quaternion,up=1-2*(q.x*q.x+q.z*q.z);
-    // SAG: độ sụt (nếu tụt quá 0.15m là sập), TILT: độ nghiêng (nếu nghiêng quá 31 độ là sập)
     if(p.y<b.home-PHYS.SAG || up<PHYS.TILT || Math.abs(p.x)>PHYS.DRIFT || Math.abs(p.z)>PHYS.DRIFT) return true
   }
   return false
@@ -331,7 +332,6 @@ $('#bSnd').onclick=()=>{Snd.on=!Snd.on;Snd.init();Snd.click();ui()};
 const restart=()=>{$('#end').classList.remove('show');Snd.init();Snd.click();build()};
 $('#bReset').onclick=restart;$('#again').onclick=restart;
 
-// Ẩn bảng số mặc định trên màn hình lớn
 if(window.innerWidth > 820) $('#pad').classList.add('hide');
 
 function resize(){
@@ -352,6 +352,8 @@ function tick(){
   requestAnimationFrame(tick);
   const dt=Math.min(clk.getDelta(),.05);time+=dt;
   
+  if(settleTime > 0) settleTime -= dt;
+
   if(state==='pull'){
     pull.s+=PHYS.SPEED*dt;const b=hold.body,s=pull.start;
     b.position.set(s.x+dir.x*pull.s,s.y,s.z+dir.z*pull.s);
@@ -380,9 +382,10 @@ function tick(){
     }
   }
 
-  world.step(1/60,dt,4); // Tối ưu FPS cho Mobile
+  world.step(1/60,dt,4); 
   
-  if(state!=='over'&&collapsed())triggerCollapse();
+  // Chỉ check sập khi tháp đã ổn định xong
+  if(state!=='over' && settleTime <= 0 && collapsed())triggerCollapse();
   
   for(const b of blocks){
     if(b.body){
