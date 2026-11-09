@@ -1,4 +1,4 @@
-# Rút Gỗ Số
+# Rút Gỗ Số Mã Nguồn EvB_Nghia
 
 Minigame rút gỗ (Jenga) có đánh số, vật lý thật, âm thanh và hiệu ứng. Chạy bằng Streamlit.
 
