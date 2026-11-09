@@ -5,14 +5,14 @@
 <style>
 :root{--bg:#10131b;--ink:#e9edf5;--mute:#8b93a7;--acc:#2de2c0;--warn:#ff6b57;--glass:rgba(22,26,38,.85);--line:rgba(255,255,255,.1)}
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{width:100%;height:100dvh;background:var(--bg);color:var(--ink);font-family:Sora,system-ui,sans-serif;overflow:hidden;user-select:none;-webkit-user-select:none}
+html,body{width:100%;height:100vh;background:var(--bg);color:var(--ink);font-family:Sora,system-ui,sans-serif;overflow:hidden;user-select:none;-webkit-user-select:none}
 #c{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
 .glass{background:var(--glass);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:16px}
 button{font:inherit;color:inherit;border:0;cursor:pointer;background:rgba(255,255,255,.08);border-radius:10px;padding:8px 12px;transition:transform .12s,background .15s}
 button:hover{background:rgba(255,255,255,.16)}button:active{transform:scale(.95)}
 button:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 
-#hud{position:absolute;left:10px;top:10px;padding:10px 14px;min-width:160px;font-size:13px;z-index:10}
+#hud{position:absolute;left:10px;top:10px;padding:10px 14px;min-width:150px;font-size:13px;z-index:10;pointer-events:none}
 #turn{font-size:15px;font-weight:600}#turn b{color:var(--acc)}
 #score{margin-top:8px;display:grid;gap:4px;color:var(--mute)}
 #score div{display:flex;justify-content:space-between;gap:16px}#score .on{color:var(--ink)}
@@ -78,7 +78,8 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-of
 
 <script>
 const CFG = __CONFIG__;
-const PHYS = {FRICTION:.8, GRAVITY:-22, SPEED:2.5, PULL_DIST:3.5, TILT:.7, SAG:.5, DRIFT:2.5};
+// Đã chỉnh lại thông số cho tháp đổ nhạy hơn (TILT giảm, SAG giảm)
+const PHYS = {FRICTION:.7, GRAVITY:-22, SPEED:2.5, PULL_DIST:3.5, TILT:.85, SAG:.15, DRIFT:1.5};
 const L=3, H=.6, W=1, GAP=.02, STEP=H+GAP, OFF=W+GAP;
 const $=s=>document.querySelector(s);
 
@@ -137,7 +138,7 @@ scene.add(new THREE.HemisphereLight(0xbcd0ff,0x1a1208,.6));
 const sun=new THREE.DirectionalLight(0xfff1d6,1.2);
 sun.position.set(7,15,6);
 sun.castShadow=true;
-sun.shadow.mapSize.set(1024,1024); // Giảm xuống 1024 cho nhẹ máy
+sun.shadow.mapSize.set(1024,1024);
 Object.assign(sun.shadow.camera,{left:-9,right:9,top:9,bottom:-9,near:1,far:40});
 sun.shadow.bias=-.0004;scene.add(sun);
 const rim=new THREE.PointLight(0x2de2c0,.8,30);rim.position.set(-6,7,-6);scene.add(rim);
@@ -150,7 +151,7 @@ ring.rotation.x=-Math.PI/2;ring.position.y=.01;scene.add(ring);
 const world=new CANNON.World();
 world.gravity.set(0,PHYS.GRAVITY,0);
 world.allowSleep=true;
-world.solver.iterations=15; // Giảm nhẹ để tăng FPS
+world.solver.iterations=15;
 const wood=new CANNON.Material('wood');
 world.addContactMaterial(new CANNON.ContactMaterial(wood,wood,{friction:PHYS.FRICTION,restitution:0,frictionEquationRelaxation:3}));
 const gnd=new CANNON.Body({mass:0,material:wood});
@@ -258,6 +259,10 @@ function startPull(){
 
 function finishPull(){
   world.remove(hold.body); hold.body=null;
+  
+  // QUAN TRỌNG: Phải đánh thức toàn bộ khối còn lại để chúng nhận ra mất trụ đỡ
+  blocks.forEach(b => { if(b.body) b.body.wakeUp(); });
+  
   scores[turn]++; Snd.vanish(); state='vanish'; pull.t=0; 
   dust(hold.mesh.position.x, hold.mesh.position.y, hold.mesh.position.z, 15, 1.5, 0x2de2c0);
 }
@@ -267,6 +272,7 @@ function collapsed(){
   for(const b of blocks){
     if(b===hold||!b.body)continue;
     const p=b.body.position,q=b.body.quaternion,up=1-2*(q.x*q.x+q.z*q.z);
+    // SAG: độ sụt (nếu tụt quá 0.15m là sập), TILT: độ nghiêng (nếu nghiêng quá 31 độ là sập)
     if(p.y<b.home-PHYS.SAG || up<PHYS.TILT || Math.abs(p.x)>PHYS.DRIFT || Math.abs(p.z)>PHYS.DRIFT) return true
   }
   return false
@@ -325,12 +331,11 @@ $('#bSnd').onclick=()=>{Snd.on=!Snd.on;Snd.init();Snd.click();ui()};
 const restart=()=>{$('#end').classList.remove('show');Snd.init();Snd.click();build()};
 $('#bReset').onclick=restart;$('#again').onclick=restart;
 
-// Không ẩn bảng số mặc định trên mobile để người chơi dễ bấm
+// Ẩn bảng số mặc định trên màn hình lớn
 if(window.innerWidth > 820) $('#pad').classList.add('hide');
 
 function resize(){
   if(!ren || !cam) return;
-  // Sử dụng kích thước thực của thẻ div chứa canvas
   const w = window.innerWidth;
   const h = window.innerHeight;
   ren.setSize(w, h, false);
@@ -341,7 +346,7 @@ window.addEventListener('resize', resize);
 resize();
 
 // ================= VÒNG LẶP GAME =================
-const clk=new THREE.Clock(),EASE=u=>u<.5?2*u*u:1-Math.pow(-2*u+2,2)/2;
+const clk=new THREE.Clock();
 
 function tick(){
   requestAnimationFrame(tick);
@@ -375,7 +380,7 @@ function tick(){
     }
   }
 
-  world.step(1/60,dt,3); // Tối ưu cho Mobile
+  world.step(1/60,dt,4); // Tối ưu FPS cho Mobile
   
   if(state!=='over'&&collapsed())triggerCollapse();
   
@@ -396,7 +401,6 @@ function tick(){
   ren.render(scene,cam);
 }
 
-// KHỞI CHẠY NGAY LẬP TỨC (Bỏ qua bước chờ Font)
 build();
 tick();
 </script></body></html>
