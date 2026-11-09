@@ -1,65 +1,84 @@
 <!doctype html>
 <html lang="vi"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;800&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#10131b;--ink:#e9edf5;--mute:#8b93a7;--acc:#2de2c0;--warn:#ff6b57;--glass:rgba(22,26,38,.66);--line:rgba(255,255,255,.1)}
-*{box-sizing:border-box;margin:0}
-html,body{height:100%;background:var(--bg);color:var(--ink);font-family:Sora,system-ui,sans-serif;overflow:hidden;user-select:none;-webkit-user-select:none}
-#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+:root{--bg:#10131b;--ink:#e9edf5;--mute:#8b93a7;--acc:#2de2c0;--warn:#ff6b57;--glass:rgba(22,26,38,.85);--line:rgba(255,255,255,.1)}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100dvh;background:var(--bg);color:var(--ink);font-family:Sora,system-ui,sans-serif;overflow:hidden;user-select:none;-webkit-user-select:none}
+#c{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
 .glass{background:var(--glass);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:16px}
 button{font:inherit;color:inherit;border:0;cursor:pointer;background:rgba(255,255,255,.08);border-radius:10px;padding:8px 12px;transition:transform .12s,background .15s}
 button:hover{background:rgba(255,255,255,.16)}button:active{transform:scale(.95)}
 button:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
-#hud{position:fixed;left:14px;top:14px;padding:12px 14px;min-width:180px;font-size:13px}
+
+#hud{position:absolute;left:10px;top:10px;padding:10px 14px;min-width:160px;font-size:13px;z-index:10}
 #turn{font-size:15px;font-weight:600}#turn b{color:var(--acc)}
 #score{margin-top:8px;display:grid;gap:4px;color:var(--mute)}
 #score div{display:flex;justify-content:space-between;gap:16px}#score .on{color:var(--ink)}
-#tools{position:fixed;right:14px;top:14px;display:flex;gap:6px;padding:6px}
-#pad{position:fixed;right:14px;top:70px;padding:10px;display:grid;grid-template-columns:repeat(6,1fr);gap:5px;max-height:calc(100% - 170px);overflow:auto}
+
+#tools{position:absolute;right:10px;top:10px;display:flex;gap:6px;padding:6px;z-index:10}
+#pad{position:absolute;right:10px;top:60px;padding:10px;display:grid;grid-template-columns:repeat(4,1fr);gap:5px;max-height:calc(100% - 140px);overflow-y:auto;z-index:10}
 #pad.hide{display:none}
-#pad button{width:38px;height:34px;padding:0;font-size:12px;font-weight:600;background:rgba(255,255,255,.07)}
+#pad button{width:36px;height:32px;padding:0;font-size:12px;font-weight:600;background:rgba(255,255,255,.07)}
 #pad button.lock{opacity:.28}
 #pad button.sel{background:var(--acc);color:#06201a}
-#bar{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;padding:10px 12px;max-width:calc(100% - 24px);flex-wrap:wrap;justify-content:center}
-#bar input{width:78px;background:rgba(255,255,255,.08);border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:8px 10px;font:inherit}
-#pull{background:var(--acc);color:#06201a;font-weight:800;padding:10px 20px}
+
+#bar{position:absolute;left:50%;bottom:15px;transform:translateX(-50%);display:flex;align-items:center;gap:8px;padding:8px 12px;width:calc(100% - 20px);max-width:400px;justify-content:center;z-index:10}
+#bar input{width:60px;background:rgba(255,255,255,.08);border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:8px 5px;font:inherit;text-align:center}
+#pull{background:var(--acc);color:#06201a;font-weight:800;padding:10px 16px;flex:1}
 #pull:disabled{opacity:.35;cursor:not-allowed}
-#msg{font-size:13px;color:var(--mute);min-width:150px;text-align:center}
-#toast{position:fixed;left:50%;top:70px;transform:translate(-50%,-10px);padding:10px 16px;font-size:14px;opacity:0;pointer-events:none;transition:.25s}
+#msg{font-size:12px;color:var(--mute);text-align:center;display:none}
+
+#toast{position:absolute;left:50%;top:60px;transform:translate(-50%,-10px);padding:10px 16px;font-size:13px;opacity:0;pointer-events:none;transition:.25s;z-index:20}
 #toast.show{opacity:1;transform:translate(-50%,0)}
-#end{position:fixed;inset:0;display:none;place-items:center;background:rgba(8,10,16,.6);backdrop-filter:blur(4px)}
+
+#end{position:absolute;inset:0;display:none;place-items:center;background:rgba(8,10,16,.8);backdrop-filter:blur(4px);z-index:30}
 #end.show{display:grid}
-#end .box{padding:28px 32px;text-align:center;max-width:340px}
-#end h2{font-size:26px;font-weight:800;margin-bottom:6px;color:var(--warn)}
-#end p{color:var(--mute);font-size:14px;line-height:1.5;margin-bottom:16px}
-#end .rank{margin-bottom:18px;display:grid;gap:4px;font-size:14px}
-@media(max-width:640px){#hud{min-width:0;padding:8px 10px}#score{display:none}#pad{top:64px}}
-@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+#end .box{padding:24px;text-align:center;max-width:320px;width:90%}
+#end h2{font-size:24px;font-weight:800;margin-bottom:6px;color:var(--warn)}
+#end p{color:var(--mute);font-size:14px;margin-bottom:16px}
+#end .rank{margin-bottom:16px;display:grid;gap:6px;font-size:14px;text-align:left}
+#end button{background:var(--acc);color:#06201a;font-weight:800;padding:12px;width:100%}
+
+/* Tối ưu Mobile */
+@media(min-width: 641px){
+  #bar{max-width:500px;bottom:20px}
+  #msg{display:block}
+  #bar input{width:80px}
+  #hud{left:20px;top:20px;padding:12px 16px}
+  #tools{right:20px;top:20px}
+  #pad{right:20px;top:75px;grid-template-columns:repeat(6,1fr)}
+}
 </style></head><body>
 <canvas id="c"></canvas>
+
 <div id="hud" class="glass"><div id="turn"></div><div id="score"></div></div>
+
 <div id="tools" class="glass">
-  <button id="bSnd" title="Bật/tắt âm thanh"></button>
-  <button id="bPad">Bảng số</button>
-  <button id="bReset">Chơi lại</button>
+  <button id="bSnd" title="Âm thanh">🔊</button>
+  <button id="bPad">Số</button>
+  <button id="bReset">Lại</button>
 </div>
-<div id="pad" class="glass"></div>
+
+<div id="pad" class="glass hide"></div>
 <div id="toast" class="glass"></div>
+
 <div id="bar" class="glass">
-  <input id="num" type="number" min="1" placeholder="Nhập số" inputmode="numeric" aria-label="Nhập số khối gỗ">
+  <input id="num" type="number" min="1" placeholder="Số" inputmode="numeric">
   <div id="msg"></div>
   <button id="pull" disabled>Rút gỗ</button>
 </div>
-<div id="end"><div class="glass box"><h2 id="eT"></h2><p id="eP"></p><div class="rank" id="eR"></div><button id="again" style="background:var(--acc);color:#06201a;font-weight:800;padding:10px 22px">Chơi ván mới</button></div></div>
 
+<div id="end"><div class="glass box"><h2 id="eT"></h2><p id="eP"></p><div class="rank" id="eR"></div><button id="again">Chơi ván mới</button></div></div>
+
+<!-- Tải thư viện -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
+
 <script>
 const CFG = __CONFIG__;
-// ---- Vật lý & luật (đã nới ngưỡng sập để tháp bền hơn) ----
-const PHYS = {FRICTION:.78, GRAVITY:-22, SPEED:2.2, PULL_DIST:3.5,
-              TILT:.72, SAG:.5, DRIFT:2.4};
+const PHYS = {FRICTION:.8, GRAVITY:-22, SPEED:2.5, PULL_DIST:3.5, TILT:.7, SAG:.5, DRIFT:2.5};
 const L=3, H=.6, W=1, GAP=.02, STEP=H+GAP, OFF=W+GAP;
 const $=s=>document.querySelector(s);
 
@@ -81,42 +100,63 @@ const Snd={ctx:null,on:CFG.sound,vol:CFG.volume,nb:null,
  warn(){this.tone(220,150,.22,'sawtooth',.1)},
  slide(d){this.noise(d,'bandpass',350,900,.22,0,2.5);this.noise(d,'lowpass',220,160,.16)},
  thud(v,delay=0){const g=Math.min(.55,.08*v);this.noise(.14,'lowpass',500,120,g,delay);this.tone(130,55,.16,'sine',g*.9,delay)},
- good(){[523,659,784].forEach((f,i)=>this.tone(f,f,.14,'triangle',.1,i*.07))},
- vanish(){this.tone(450,900,.15,'triangle',.1);this.tone(900,600,.14,'sine',.06,.08)},
+ vanish(){this.tone(400,800,.2,'triangle',.12);this.tone(800,1200,.15,'sine',.08,.1)},
  collapse(){for(let i=0;i<16;i++)this.thud(3+Math.random()*5,i*.09+Math.random()*.08);this.noise(1.8,'lowpass',700,60,.5);
   [392,330,262,196].forEach((f,i)=>this.tone(f,f*.98,.25,'sawtooth',.08,1.3+i*.18))}
 };
 
-// ---- Bridge từ Streamlit sidebar: điều khiển âm thanh LIVE ----
 window.addEventListener('message', e=>{
   const d=e.data;
   if(!d||d.type!=='sound')return;
   Snd.on=!!d.on;
   Snd.vol=Math.max(0,Math.min(1,Number(d.volume)||0));
-  if(Snd.on)Snd.init();
+  if(Snd.on) Snd.init();
   ui();
 });
 
-// ================= 3D + VẬT LÝ =================
+// ================= KHỞI TẠO 3D =================
 const cv=$('#c');
-const ren=new THREE.WebGLRenderer({canvas:cv,antialias:true});
-ren.setPixelRatio(Math.min(devicePixelRatio,2));ren.shadowMap.enabled=true;ren.shadowMap.type=THREE.PCFSoftShadowMap;
-ren.outputEncoding=THREE.sRGBEncoding;ren.toneMapping=THREE.ACESFilmicToneMapping;
-const scene=new THREE.Scene();scene.background=new THREE.Color(0x10131b);scene.fog=new THREE.Fog(0x10131b,26,60);
-const cam=new THREE.PerspectiveCamera(45,1,.1,100);
+let ren, scene, cam;
+try {
+  ren = new THREE.WebGLRenderer({canvas:cv, antialias:false, powerPreference:"high-performance"});
+  ren.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  ren.shadowMap.enabled=true;
+  ren.shadowMap.type=THREE.PCFSoftShadowMap;
+  ren.outputEncoding=THREE.sRGBEncoding;
+  ren.toneMapping=THREE.ACESFilmicToneMapping;
+  
+  scene = new THREE.Scene();
+  scene.background=new THREE.Color(0x10131b);
+  scene.fog=new THREE.Fog(0x10131b,26,60);
+  cam = new THREE.PerspectiveCamera(45,1,.1,100);
+} catch(e) {
+  alert("Thiết bị của bạn không hỗ trợ WebGL để chạy 3D!");
+}
+
 scene.add(new THREE.HemisphereLight(0xbcd0ff,0x1a1208,.6));
-const sun=new THREE.DirectionalLight(0xfff1d6,1.2);sun.position.set(7,15,6);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);
-Object.assign(sun.shadow.camera,{left:-9,right:9,top:9,bottom:-9,near:1,far:40});sun.shadow.bias=-.0004;scene.add(sun);
+const sun=new THREE.DirectionalLight(0xfff1d6,1.2);
+sun.position.set(7,15,6);
+sun.castShadow=true;
+sun.shadow.mapSize.set(1024,1024); // Giảm xuống 1024 cho nhẹ máy
+Object.assign(sun.shadow.camera,{left:-9,right:9,top:9,bottom:-9,near:1,far:40});
+sun.shadow.bias=-.0004;scene.add(sun);
 const rim=new THREE.PointLight(0x2de2c0,.8,30);rim.position.set(-6,7,-6);scene.add(rim);
+
 const floor=new THREE.Mesh(new THREE.CircleGeometry(60,64),new THREE.MeshStandardMaterial({color:0x1a1f2c,roughness:.85}));
 floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
 const ring=new THREE.Mesh(new THREE.RingGeometry(2.7,2.76,64),new THREE.MeshBasicMaterial({color:0x2de2c0,transparent:true,opacity:.55}));
 ring.rotation.x=-Math.PI/2;ring.position.y=.01;scene.add(ring);
 
-const world=new CANNON.World();world.gravity.set(0,PHYS.GRAVITY,0);world.allowSleep=true;world.solver.iterations=22;
+const world=new CANNON.World();
+world.gravity.set(0,PHYS.GRAVITY,0);
+world.allowSleep=true;
+world.solver.iterations=15; // Giảm nhẹ để tăng FPS
 const wood=new CANNON.Material('wood');
 world.addContactMaterial(new CANNON.ContactMaterial(wood,wood,{friction:PHYS.FRICTION,restitution:0,frictionEquationRelaxation:3}));
-const gnd=new CANNON.Body({mass:0,material:wood});gnd.addShape(new CANNON.Plane());gnd.quaternion.setFromEuler(-Math.PI/2,0,0);world.addBody(gnd);
+const gnd=new CANNON.Body({mass:0,material:wood});
+gnd.addShape(new CANNON.Plane());
+gnd.quaternion.setFromEuler(-Math.PI/2,0,0);
+world.addBody(gnd);
 
 // ================= KHỐI GỖ =================
 const boxGeo=new THREE.BoxGeometry(L,H,W);
@@ -127,18 +167,236 @@ function woodTex(w,h,hue,light,num,fs,pw){
   if(num!=null){
     x.fillStyle='rgba(16,19,27,.82)';const ph=h*.8,px=(w-pw)/2,py=(h-ph)/2,r=ph*.28;
     x.beginPath();x.moveTo(px+r,py);x.arcTo(px+pw,py,px+pw,py+ph,r);x.arcTo(px+pw,py+ph,px,py+ph,r);x.arcTo(px,py+ph,px,py,r);x.arcTo(px,py,px+pw,py,r);x.fill();
-    x.fillStyle='#fff1d8';x.font=`800 ${fs}px Sora,system-ui,sans-serif`;x.textAlign='center';x.textBaseline='middle';x.fillText(num,w/2,h/2+fs*.04)}
-  const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;t.anisotropy=4;return t}
-function makeMats(id){
-  const hue=26+Math.random()*8,li=52+Math.random()*10,mk=t=>new THREE.MeshStandardMaterial({map:t,roughness:.72,metalness:0});
-  const end=mk(woodTex(192,115,hue,li,id,66,128)),top=mk(woodTex(256,96,hue,li-4,null)),lng=mk(woodTex(640,128,hue,li,id,88,190));
-  return {list:[end,top,lng],arr:[end,end,top,top,lng,lng]}}
+    x.fillStyle='#fff1d8';x.font=`800 ${fs}px Sora, sans-serif`;x.textAlign='center';x.textBaseline='middle';x.fillText(num,w/2,h/2+fs*.04)}
+  const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;t.anisotropy=2;return t}
 
-let blocks=[],hold=null,selected=null,hover=null,state='idle',turn=0,scores=[],time=0,shake=0,fx=[],lastHit=0,dir={x:1,z:0},pull={s:0,t:0,start:null,vy:null};
+function makeMats(id){
+  const hue=26+Math.random()*8,li=52+Math.random()*10;
+  const mk=t=>new THREE.MeshStandardMaterial({map:t,roughness:.72,metalness:0,transparent:true});
+  const end=mk(woodTex(192,115,hue,li,id,66,128)),top=mk(woodTex(256,96,hue,li-4,null)),lng=mk(woodTex(640,128,hue,li,id,88,190));
+  return {list:[end,top,lng],arr:[end,end,top,top,lng,lng]};
+}
+
+let blocks=[], hold=null, selected=null, hover=null, state='idle';
+let turn=0, scores=[], time=0, shake=0, fx=[], lastHit=0, dir={x:1,z:0}, pull={s:0,t:0,start:null};
 const N=CFG.players.length;
 
 function pose(layer,slot){const y=H/2+layer*STEP,o=(slot-1)*OFF;return layer%2===0?{x:0,y,z:o,r:0}:{x:o,y,z:0,r:Math.PI/2}}
+
 function addBody(b,p,drop=0){
-  const body=new CANNON.Body({mass:1,material:wood});body.addShape(new CANNON.Box(new CANNON.Vec3(L/2,H/2,W/2)));
+  const body=new CANNON.Body({mass:1,material:wood});
+  body.addShape(new CANNON.Box(new CANNON.Vec3(L/2,H/2,W/2)));
   body.position.set(p.x,p.y+drop,p.z);body.quaternion.setFromEuler(0,p.r,0);
-  body.allowSleep=true;body.sleepSpeedLimit=.2;body.sleep
+  body.allowSleep=true;body.sleepSpeedLimit=.2;body.sleepTimeLimit=.5;body.linearDamping=.04;body.angularDamping=.1;
+  body.addEventListener('collide',e=>{if(state==='over')return;const v=Math.abs(e.contact.getImpactVelocityAlongNormal()),n=performance.now();
+    if(v>1.2&&n-lastHit>40){lastHit=n;Snd.thud(v)}});
+  world.addBody(body);b.body=body;b.home=p.y;
+}
+
+function build(){
+  blocks.forEach(b=>{scene.remove(b.mesh);if(b.body)world.remove(b.body);b.mats.list.forEach(m=>{if(m.map)m.map.dispose();m.dispose()})});
+  blocks=[];hold=null;selected=null;let id=1;
+  for(let l=0;l<CFG.layers;l++)for(let s=0;s<3;s++){
+    const m=makeMats(id),mesh=new THREE.Mesh(boxGeo,m.arr);mesh.castShadow=mesh.receiveShadow=true;
+    const b={id:id++,mesh,mats:m,layer:l,slot:s,body:null,home:0};mesh.userData.b=b;scene.add(mesh);
+    const p=pose(l,s);addBody(b,p);b.body.sleep();mesh.position.set(p.x,p.y,p.z);mesh.rotation.y=p.r;blocks.push(b)}
+  scores=CFG.players.map(()=>0);turn=0;state='idle';shake=0;
+  buildPad();ui();
+}
+const topLayer=()=>{let t=0;blocks.forEach(b=>{if(b!==hold&&b.layer>t)t=b.layer});return t};
+
+// ================= HIỆU ỨNG =================
+function dust(x,y,z,n,spread=1,col=0xd9b27c){
+  const g=new THREE.BufferGeometry(),pos=new Float32Array(n*3),vel=[];
+  for(let i=0;i<n;i++){pos.set([x+(Math.random()-.5)*spread,y,z+(Math.random()-.5)*spread],i*3);vel.push(new THREE.Vector3((Math.random()-.5)*2,Math.random()*2,(Math.random()-.5)*2))}
+  g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  const m=new THREE.PointsMaterial({color:col,size:.13,transparent:true,opacity:.8,depthWrite:false}),p=new THREE.Points(g,m);scene.add(p);fx.push({p,vel,t:0})}
+function stepFx(dt){for(let i=fx.length-1;i>=0;i--){const f=fx[i];f.t+=dt;const a=f.p.geometry.attributes.position;
+  f.vel.forEach((v,k)=>{a.setXYZ(k,a.getX(k)+v.x*dt,a.getY(k)+v.y*dt,a.getZ(k)+v.z*dt);v.multiplyScalar(.97);v.y-=dt*1.5});a.needsUpdate=true;
+  f.p.material.opacity=.8*Math.max(0,1-f.t/1.1);if(f.t>1.1){scene.remove(f.p);f.p.geometry.dispose();f.p.material.dispose();fx.splice(i,1)}}}
+let tt;function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>e.classList.remove('show'),1900)}
+
+// ================= GIAO DIỆN =================
+function buildPad(){
+  const p=$('#pad');p.innerHTML='';
+  blocks.forEach(b=>{
+    const e=document.createElement('button');e.textContent=b.id;e.dataset.id=b.id;
+    e.onclick=()=>choose(b);p.appendChild(e)
+  })
+}
+function ui(){
+  $('#turn').innerHTML=`Lượt: <b>${CFG.players[turn]}</b>`;
+  $('#score').innerHTML=CFG.players.map((n,i)=>`<div class="${i===turn?'on':''}"><span>${n}</span><span>${scores[i]}</span></div>`).join('');
+  const tl=topLayer();
+  document.querySelectorAll('#pad button').forEach(e=>{
+    const b=blocks.find(x=>x.id==e.dataset.id);
+    if(b){e.classList.toggle('lock',b.layer>=tl);e.classList.toggle('sel',b===selected)}
+  });
+  $('#pull').disabled=!(selected&&state==='idle');
+  $('#pull').textContent=selected?`Rút ${selected.id}`:'Rút gỗ';
+  $('#msg').textContent=state!=='idle'?'Đang rút...':selected?`Đã chọn ${selected.id}`:'Chọn khối';
+  $('#bSnd').textContent=Snd.on?'🔊':'🔇';
+}
+
+function choose(b){
+  Snd.init();if(state!=='idle'){toast('Đợi chút đã');return}
+  if(!b||b.layer>=topLayer()){Snd.warn();toast('Tầng trên cùng không rút được!');return}
+  selected=b;Snd.select();ui();
+}
+
+// ================= RÚT GỖ =================
+function startPull(){
+  if(!selected||state!=='idle')return;Snd.init();hold=selected;const b=hold,body=b.body;
+  const ax=b.layer%2===0?{x:1,z:0}:{x:0,z:1},d=ax.x*Math.sin(orb.az)+ax.z*Math.cos(orb.az),sg=d>=0?1:-1;
+  dir={x:ax.x*sg,z:ax.z*sg};
+  
+  body.type=CANNON.Body.KINEMATIC;body.mass=0;body.updateMassProperties();body.allowSleep=false;body.wakeUp();
+  pull={s:0,t:0,start:{x:body.position.x,y:body.position.y,z:body.position.z}};
+  state='pull';
+  Snd.slide(PHYS.PULL_DIST/PHYS.SPEED);ui();
+}
+
+function finishPull(){
+  world.remove(hold.body); hold.body=null;
+  scores[turn]++; Snd.vanish(); state='vanish'; pull.t=0; 
+  dust(hold.mesh.position.x, hold.mesh.position.y, hold.mesh.position.z, 15, 1.5, 0x2de2c0);
+}
+
+// ================= SẬP THÁP =================
+function collapsed(){
+  for(const b of blocks){
+    if(b===hold||!b.body)continue;
+    const p=b.body.position,q=b.body.quaternion,up=1-2*(q.x*q.x+q.z*q.z);
+    if(p.y<b.home-PHYS.SAG || up<PHYS.TILT || Math.abs(p.x)>PHYS.DRIFT || Math.abs(p.z)>PHYS.DRIFT) return true
+  }
+  return false
+}
+
+function triggerCollapse(){
+  const loser=turn;
+  state='over';blocks.forEach(b=>b.body&&b.body.wakeUp());
+  Snd.collapse();shake=.7;
+  for(let i=0;i<5;i++)setTimeout(()=>dust((Math.random()-.5)*3,.3,(Math.random()-.5)*3,24,3),i*180);
+  setTimeout(()=>{
+    $('#eT').textContent='Tháp sập!';
+    $('#eP').textContent=`${CFG.players[loser]} làm đổ tháp.`;
+    $('#eR').innerHTML=CFG.players.map((n,i)=>({n,s:scores[i]})).sort((a,b)=>b.s-a.s).map(o=>`<div>${o.n}: ${o.s} khối</div>`).join('');
+    $('#end').classList.add('show')},2000)
+}
+
+// ================= CAMERA & ĐIỀU KHIỂN =================
+const orb={az:.7,pol:1.12,r:15},tgt=new THREE.Vector3(0,3,0),ray=new THREE.Raycaster(),mouse=new THREE.Vector2();
+function pick(cx,cy){
+  const r=cv.getBoundingClientRect();
+  mouse.set((cx-r.left)/r.width*2-1,-((cy-r.top)/r.height)*2+1);
+  ray.setFromCamera(mouse,cam);
+  const h=ray.intersectObjects(blocks.map(b=>b.mesh))[0];
+  return h?h.object.userData.b:null;
+}
+
+const ptr=new Map();let moved=0,lastTap={id:0,t:0},pinch=0;
+cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);ptr.set(e.pointerId,{x:e.clientX,y:e.clientY});moved=0;cv.style.cursor='grabbing';Snd.init()});
+cv.addEventListener('pointermove',e=>{
+  const p=ptr.get(e.pointerId);
+  if(!p){const b=pick(e.clientX,e.clientY);hover=b&&b.layer<topLayer()?b:null;cv.style.cursor=hover?'pointer':'grab';return}
+  if(ptr.size===2){const [a,c]=[...ptr.values()],d=Math.hypot(a.x-c.x,a.y-c.y);if(pinch)orb.r=Math.min(28,Math.max(7,orb.r*pinch/d));pinch=d}
+  else{const dx=e.clientX-p.x,dy=e.clientY-p.y;moved+=Math.abs(dx)+Math.abs(dy);orb.az-=dx*.008;orb.pol=Math.min(1.5,Math.max(.25,orb.pol-dy*.006))}
+  p.x=e.clientX;p.y=e.clientY});
+
+cv.addEventListener('pointerup',e=>{
+  const single=ptr.size===1;ptr.delete(e.pointerId);pinch=0;cv.style.cursor='grab';
+  if(single&&moved<8){
+    const b=pick(e.clientX,e.clientY);
+    if(b){
+      const now=performance.now();
+      if(selected===b&&lastTap.id===b.id&&now-lastTap.t<450){startPull();return}
+      lastTap={id:b.id,t:now};choose(b)
+    }
+  }
+});
+cv.addEventListener('pointercancel',e=>{ptr.delete(e.pointerId);pinch=0});
+cv.addEventListener('wheel',e=>{e.preventDefault();orb.r=Math.min(28,Math.max(7,orb.r*(1+e.deltaY*.001)))},{passive:false});
+
+$('#pull').onclick=startPull;
+$('#num').addEventListener('keydown',e=>{if(e.key==='Enter'){const b=blocks.find(x=>x.id==parseInt(e.target.value));if(b)choose(b);else{Snd.warn();toast('Không có khối này')}}});
+$('#bPad').onclick=()=>{Snd.init();Snd.click();$('#pad').classList.toggle('hide')};
+$('#bSnd').onclick=()=>{Snd.on=!Snd.on;Snd.init();Snd.click();ui()};
+
+const restart=()=>{$('#end').classList.remove('show');Snd.init();Snd.click();build()};
+$('#bReset').onclick=restart;$('#again').onclick=restart;
+
+// Không ẩn bảng số mặc định trên mobile để người chơi dễ bấm
+if(window.innerWidth > 820) $('#pad').classList.add('hide');
+
+function resize(){
+  if(!ren || !cam) return;
+  // Sử dụng kích thước thực của thẻ div chứa canvas
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  ren.setSize(w, h, false);
+  cam.aspect = w / h;
+  cam.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ================= VÒNG LẶP GAME =================
+const clk=new THREE.Clock(),EASE=u=>u<.5?2*u*u:1-Math.pow(-2*u+2,2)/2;
+
+function tick(){
+  requestAnimationFrame(tick);
+  const dt=Math.min(clk.getDelta(),.05);time+=dt;
+  
+  if(state==='pull'){
+    pull.s+=PHYS.SPEED*dt;const b=hold.body,s=pull.start;
+    b.position.set(s.x+dir.x*pull.s,s.y,s.z+dir.z*pull.s);
+    b.velocity.set(dir.x*PHYS.SPEED,0,dir.z*PHYS.SPEED);
+    b.angularVelocity.set(0,0,0);b.aabbNeedsUpdate=true;
+    if(pull.s>=PHYS.PULL_DIST){
+      b.velocity.set(0,0,0);
+      finishPull(); 
+    }
+  }
+  else if(state==='vanish'){
+    pull.t+=dt; const u=Math.min(1,pull.t/.6);
+    hold.mesh.position.y += dt*3;
+    hold.mesh.scale.setScalar(1-u);
+    hold.mats.list.forEach(m=>m.opacity = 1-u);
+    
+    if(u>=1){
+      scene.remove(hold.mesh);
+      blocks = blocks.filter(x=>x!==hold); 
+      hold=null; selected=null;
+      state='idle';
+      turn=(turn+1)%N;
+      ui();
+      buildPad(); 
+      toast(`Lượt của ${CFG.players[turn]}`);
+    }
+  }
+
+  world.step(1/60,dt,3); // Tối ưu cho Mobile
+  
+  if(state!=='over'&&collapsed())triggerCollapse();
+  
+  for(const b of blocks){
+    if(b.body){
+      b.mesh.position.copy(b.body.position);
+      b.mesh.quaternion.copy(b.body.quaternion);
+    }
+    const sel=b===selected, hv=b===hover&&!sel, k=sel?.35+.25*Math.sin(time*5):hv?.12:0;
+    b.mats.list.forEach(m=>{m.emissive.setHex(sel?0x2de2c0:0xffffff);m.emissiveIntensity=k});
+  }
+  
+  stepFx(dt);
+  const topY=H+topLayer()*STEP;tgt.y+=(Math.max(2.4,topY*.48)-tgt.y)*Math.min(1,dt*2);
+  shake=Math.max(0,shake-dt*.5);const sx=(Math.random()-.5)*shake,sy=(Math.random()-.5)*shake;
+  cam.position.set(tgt.x+orb.r*Math.sin(orb.pol)*Math.sin(orb.az)+sx,tgt.y+orb.r*Math.cos(orb.pol)+sy,tgt.z+orb.r*Math.sin(orb.pol)*Math.cos(orb.az));
+  cam.lookAt(tgt);
+  ren.render(scene,cam);
+}
+
+// KHỞI CHẠY NGAY LẬP TỨC (Bỏ qua bước chờ Font)
+build();
+tick();
+</script></body></html>
